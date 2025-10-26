@@ -1,88 +1,70 @@
 import streamlit as st
 import pandas as pd
-import psycopg2
+from supabase import create_client, Client
 from io import BytesIO
 from datetime import date
 
 # -----------------------------
-# Database Connection Settings
+# Initialize Supabase Client
 # -----------------------------
-def get_connection():
-    return psycopg2.connect(
-        host=st.secrets["supabase"]["host"],
-        port=st.secrets["supabase"]["port"],
-        database=st.secrets["supabase"]["database"],
-        user=st.secrets["supabase"]["user"],
-        password=st.secrets["supabase"]["password"],
-        sslmode="require"
-    )
+@st.cache_resource
+def init_connection() -> Client:
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
+
+supabase = init_connection()
 
 # -----------------------------
 # Upload Excel File → sku_actual_changes
 # -----------------------------
 def upload_to_staging(df):
-    conn = get_connection()
-    cur = conn.cursor()
+    # Truncate table before inserting new data
+    supabase.rpc("truncate_table", {"table_name": "sku_actual_changes"}).execute()
 
-    # Optional: clean before insert (good for weekly overwrite)
-    cur.execute("TRUNCATE TABLE sku_actual_changes;")
+    # Convert dataframe to list of dictionaries for bulk insert
+    data_to_insert = df.to_dict(orient="records")
 
-    insert_query = """
-        INSERT INTO sku_actual_changes (
-            store_id, old_product_code, old_sku_code,
-            new_product_code, new_barcode, new_price,
-            valid_from, valid_to
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s);
-    """
-
-    for _, row in df.iterrows():
-        cur.execute(insert_query, (
-            row.get('store_id'),
-            row.get('old_product_code'),
-            row.get('old_sku_code'),
-            row.get('new_product_code'),
-            row.get('new_barcode'),
-            row.get('new_price'),
-            pd.to_datetime(row.get('valid_from')).date() if not pd.isna(row.get('valid_from')) else None,
-            pd.to_datetime(row.get('valid_to')).date() if not pd.isna(row.get('valid_to')) else None
-        ))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+    # Insert all rows into Supabase
+    response = supabase.table("sku_actual_changes").insert(data_to_insert).execute()
+    if response.error:
+        raise Exception(response.error.message)
 
 # -----------------------------
 # Run Stored Procedure
 # -----------------------------
 def run_procedure(valid_from, valid_to):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("CALL process_sku_weekly_changes(%s, %s);", (valid_from, valid_to))
-    conn.commit()
-    cur.close()
-    conn.close()
+    # Call your stored procedure on Supabase
+    response = supabase.rpc("process_sku_weekly_changes", {
+        "valid_from": str(valid_from),
+        "valid_to": str(valid_to)
+    }).execute()
+    if response.error:
+        raise Exception(response.error.message)
 
 # -----------------------------
 # Fetch Updated sku_master
 # -----------------------------
 def fetch_sku_master():
-    conn = get_connection()
-    df = pd.read_sql("SELECT * FROM sku_master ORDER BY store, barcode;", conn)
-    conn.close()
-    return df
+    response = supabase.table("sku_master").select("*").order("store_id").limit(1000).execute()
+    if response.error:
+        raise Exception(response.error.message)
+    return pd.DataFrame(response.data)
 
 # -----------------------------
 # Generic Table Loader
 # -----------------------------
 def load_table(table_name):
-    with get_connection() as conn:
-        return pd.read_sql(f"SELECT * FROM {table_name} ORDER BY 1 DESC LIMIT 100;", conn)
+    response = supabase.table(table_name).select("*").limit(100).execute()
+    if response.error:
+        raise Exception(response.error.message)
+    return pd.DataFrame(response.data)
 
 # -----------------------------
 # Streamlit UI
 # -----------------------------
 st.set_page_config(page_title="SKU Weekly Update", layout="wide")
-st.title("🧾 SKU Weekly Update Processor")
+st.title("🧾 SKU Weekly Update Processor (Supabase Version)")
 
 uploaded_file = st.file_uploader("📤 Upload SKU Actual Changes File", type=["xlsx", "csv"])
 valid_from = st.date_input("📅 Valid From", date.today())
@@ -141,4 +123,3 @@ with tab3:
 
 with tab4:
     st.dataframe(load_table("sku_log"))
-
