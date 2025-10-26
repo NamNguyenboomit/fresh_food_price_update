@@ -55,7 +55,7 @@ def fetch_sku_master():
 # Generic Table Loader
 # -----------------------------
 def load_table(table_name):
-    response = supabase.table(table_name).select("*").limit(100).execute()
+    response = supabase.table(table_name).select("*").limit(2000).execute()
 
     # The response is an object with a .data attribute
     if hasattr(response, "data"):
