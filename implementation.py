@@ -46,7 +46,7 @@ def run_procedure(valid_from, valid_to):
 # Fetch Updated sku_master
 # -----------------------------
 def fetch_sku_master():
-    response = supabase.table("sku_master").select("*").order("store_id").limit(1000).execute()
+    response = supabase.table("sku_master").select("*").order("store_id").limit(2000).execute()
     if response.error:
         raise Exception(response.error.message)
     return pd.DataFrame(response.data)
