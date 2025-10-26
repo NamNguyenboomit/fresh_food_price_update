@@ -57,14 +57,18 @@ def fetch_sku_master():
 def load_table(table_name):
     response = supabase.table(table_name).select("*").limit(100).execute()
 
-    # Extract data properly from the response
-    data = getattr(response, "data", None) or response.get("data", [])
+    # The response is an object with a .data attribute
+    if hasattr(response, "data"):
+        data = response.data
+    else:
+        st.warning(f"⚠️ Unexpected response format for {table_name}")
+        return pd.DataFrame()
 
     if not data:
         st.warning(f"No data found in table: {table_name}")
         return pd.DataFrame()
 
-    # Convert to DataFrame so Streamlit shows a nice table
+    # Convert data to DataFrame
     df = pd.DataFrame(data)
     return df
 # -----------------------------
