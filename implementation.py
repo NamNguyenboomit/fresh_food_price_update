@@ -7,16 +7,15 @@ from datetime import date
 # -----------------------------
 # Database Connection Settings
 # -----------------------------
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "fresh_food",
-    "user": "postgres",
-    "password": "10111309"
-}
-
 def get_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        port=st.secrets["postgres"]["port"],
+        dbname=st.secrets["postgres"]["dbname"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"]
+    )
+    return conn
 
 # -----------------------------
 # Upload Excel File → sku_actual_changes
