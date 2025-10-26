@@ -13,7 +13,8 @@ def get_connection():
         port=st.secrets["supabase"]["port"],
         database=st.secrets["supabase"]["database"],
         user=st.secrets["supabase"]["user"],
-        password=st.secrets["supabase"]["password"]
+        password=st.secrets["supabase"]["password"],
+        sslmode="require"
     )
 
 # -----------------------------
