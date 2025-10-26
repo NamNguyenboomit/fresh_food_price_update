@@ -57,7 +57,7 @@ def run_procedure(valid_from, valid_to):
 # -----------------------------
 def fetch_sku_master():
     conn = get_connection()
-    df = pd.read_sql("SELECT * FROM sku_master ORDER BY store, product_code;", conn)
+    df = pd.read_sql("SELECT * FROM sku_master;", conn)
     conn.close()
     return df
 
@@ -66,29 +66,37 @@ def fetch_sku_master():
 # -----------------------------
 st.title("🧾 SKU Weekly Update Processor")
 
-uploaded_file = st.file_uploader("Upload SKU Actual Changes Excel", type=["xlsx"])
+# Allow both Excel and CSV upload
+uploaded_file = st.file_uploader("Upload SKU Actual Changes File", type=["xlsx", "csv"])
 
 valid_from = st.date_input("Valid From", date.today())
 valid_to = st.date_input("Valid To", date.today())
 
 if uploaded_file is not None:
-    df_uploaded = pd.read_excel(uploaded_file)
-    st.write("✅ Preview of Uploaded Data:", df_uploaded.head())
+    # Detect file type and read accordingly
+    file_name = uploaded_file.name.lower()
+    if file_name.endswith(".csv"):
+        df_uploaded = pd.read_csv(uploaded_file)
+    else:
+        df_uploaded = pd.read_excel(uploaded_file)
+
+    st.write("Preview of Uploaded Data:", df_uploaded.head())
 
     if st.button("Run Update Procedure"):
         try:
+            # Your existing functions
             upload_to_staging(df_uploaded)
             run_procedure(valid_from, valid_to)
             st.success("Procedure executed successfully!")
 
             df_master = fetch_sku_master()
-            st.write("📦 Updated SKU Master Table:", df_master.head())
+            st.write("Updated SKU Master Table:", df_master.head())
 
-            # Download as Excel
+            # Always export final result as Excel
             output = BytesIO()
             df_master.to_excel(output, index=False)
             st.download_button(
-                label="⬇️ Download Updated SKU Master",
+                label="Download Updated SKU Master",
                 data=output.getvalue(),
                 file_name="sku_master_updated.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
