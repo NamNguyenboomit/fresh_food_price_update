@@ -57,17 +57,16 @@ def fetch_sku_master():
 def load_table(table_name):
     response = supabase.table(table_name).select("*").limit(100).execute()
 
-    # In v2, response.data and response.error are not direct attributes anymore
-    data = response.data if hasattr(response, "data") else response.get("data", [])
-    
+    # Extract data properly from the response
+    data = getattr(response, "data", None) or response.get("data", [])
+
     if not data:
         st.warning(f"No data found in table: {table_name}")
         return pd.DataFrame()
-    
-    st.write(response)
 
-    return pd.DataFrame(data)
-
+    # Convert to DataFrame so Streamlit shows a nice table
+    df = pd.DataFrame(data)
+    return df
 # -----------------------------
 # Streamlit UI
 # -----------------------------
